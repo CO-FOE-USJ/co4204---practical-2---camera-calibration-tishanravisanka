@@ -27,6 +27,7 @@ def calibrateCamera(images_folder):
     print((images_folder.split('/')[1]).split('*')[0])
     images_names = glob.glob(images_folder)
     images = []
+    calibratedImages = []
     for imname in images_names:
         im = cv.imread(imname, 1)
         images.append(im)
@@ -40,7 +41,6 @@ def calibrateCamera(images_folder):
     width = images[0].shape[1]
     height = images[0].shape[0]
     
-    i = 1
     for frame in images:
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
  
@@ -54,8 +54,7 @@ def calibrateCamera(images_folder):
             corners = cv.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             cv.drawChessboardCorners(frame, (rows,columns), corners, ret)
 
-            cv.imwrite('Calibrated/'+(images_folder.split('/')[1]).split('*')[0]+'_'+str(i)+'.bmp', frame)
-            i+=1
+            calibratedImages.append(frame)
  
             objPoints.append(objp)
             imgPoints.append(corners)
@@ -63,9 +62,9 @@ def calibrateCamera(images_folder):
  
     ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objPoints, imgPoints, (width, height), None, None)
  
-    return mtx, dist ,imgPoints, objPoints 
+    return mtx, dist ,imgPoints, objPoints, calibratedImages
  
-def stereo_calibrate(mtx1, dist1, imgpoints_left, mtx2, dist2, imgpoints_right, objpts):
+def stereoCalibrate(mtx1, dist1, imgpoints_left, mtx2, dist2, imgpoints_right, objpts):
     
     stereocalibration_flags = cv.CALIB_FIX_INTRINSIC
     ret, CM1, distC1, CM2, distC2, R, T, E, F = cv.stereoCalibrate(objpts, imgpoints_left, imgpoints_right, mtx1, dist1,
@@ -94,7 +93,7 @@ def fileWrite(file, title, data):
 
 def saveProperties(CM1, distC1, CM2, distC2, R, T, E, F):
 
-    file=open("camera_properties.txt","w")
+    file=open("Parameters/cameraparameters.txt","w")
     fileWrite(file, "cameraMatrix1 - Left camera intrinsics", CM1)
     fileWrite(file, "distCoeffs1 - Left camera distortion coefficients", distC1)
     fileWrite(file, "cameraMatrix2 - Right camera intrinsics", CM2)
@@ -105,39 +104,39 @@ def saveProperties(CM1, distC1, CM2, distC2, R, T, E, F):
     fileWrite(file, "F - Fundamental Matrix", F)
 
 
-def drawLines(leftMap1, leftMap2, rightMap1, rightMap2):
-    leftImgs = glob.glob('Calibrated/left*.bmp')
-    rightImgs = glob.glob('Calibrated/right*.bmp')
+def drawLines(leftMap1, leftMap2, rightMap1, rightMap2, calibratedImages1, calibratedImages2):
 
-    count = 1
-    for leftImg, rightImg in zip(leftImgs, rightImgs):
-        o_l = cv.imread(leftImg)
-        o_r = cv.imread(rightImg)
+    for leftImg, rightImg in zip(calibratedImages1, calibratedImages2):
 
-        good_pt_left = cv.remap(o_l, leftMap1, leftMap2, cv.INTER_LINEAR)
-        good_pt_right = cv.remap(o_r, rightMap1, rightMap2, cv.INTER_LINEAR)
+        good_pt_left = cv.remap(leftImg, leftMap1, leftMap2, cv.INTER_LINEAR)
+        good_pt_right = cv.remap(rightImg, rightMap1, rightMap2, cv.INTER_LINEAR)
 
+        # image combining
         concat_img = cv.hconcat([good_pt_left, good_pt_right])
 
         cropped_image = concat_img[300:1800, 600:4300]
         croppedHeight = cropped_image.shape[0]
         croppedWidth = cropped_image.shape[1]
 
+        # drawing lines
         for i in range(0, croppedHeight, 10):
             cv.line(cropped_image, (0, i), (croppedWidth, i), (0, 255, 0))
-            cv.line(cropped_image, (int(croppedWidth / 2), 0), (int(croppedWidth / 2), croppedHeight),
-             (0, 255, 0))
-        cv.imwrite('Rectified/rectified_'+str(count)+'.jpeg', cropped_image)
-        count+=1
+
+        cv.destroyAllWindows()
+        cv.namedWindow("Rectified Image", cv.WINDOW_NORMAL)
+        cv.resizeWindow("Rectified Image", 500, 400)
+        cv.imshow('Rectified Image', cropped_image)
+        cv.waitKey(8000)
+        
 
 
-mtx1, dist1, imgPoints1, objPoints1 = calibrateCamera(images_folder = 'Chessboard/left*.bmp')
-mtx2, dist2, imgPoints2, objPoints2 = calibrateCamera(images_folder = 'Chessboard/right*.bmp')
+mtx1, dist1, imgPoints1, objPoints1, calibratedImages1 = calibrateCamera(images_folder = 'Chessboard/left*.bmp')
+mtx2, dist2, imgPoints2, objPoints2, calibratedImages2 = calibrateCamera(images_folder = 'Chessboard/right*.bmp')
  
-CM1, distC1, CM2, distC2, R, T, E, F = stereo_calibrate(mtx1, dist1, imgPoints1, mtx2, dist2, imgPoints2, objPoints1)
+CM1, distC1, CM2, distC2, R, T, E, F = stereoCalibrate(mtx1, dist1, imgPoints1, mtx2, dist2, imgPoints2, objPoints1)
  
 leftMap1, leftMap2, rightMap1, rightMap2= rectification(CM1, distC1, CM2, distC2, R, T)
 
-drawLines(leftMap1, leftMap2, rightMap1, rightMap2)
+drawLines(leftMap1, leftMap2, rightMap1, rightMap2, calibratedImages1, calibratedImages2)
 
 saveProperties(CM1, distC1, CM2, distC2, R, T, E, F)
