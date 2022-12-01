@@ -198,18 +198,18 @@ def disparityMap(leftImgs, rightImgs):
         # disparityMapCal(leftImg,rightImg)
 
 
-        window_size = 5
+        window_size = 3
         stereo = cv.StereoSGBM_create(
-            minDisparity=-16,
-            numDisparities=80,
+            minDisparity=25,
+            numDisparities=128,
             blockSize=5,
-            P1=8 * 3 * window_size ** 2,
-            P2=32 * 3 * window_size ** 2,
-            disp12MaxDiff=10,
-            uniquenessRatio=10,
-            speckleWindowSize=50,
-            speckleRange=2,
-            preFilterCap=63,
+            P1=8 *  window_size ** 2,
+            P2=32 *  window_size ** 2,
+            disp12MaxDiff=25,
+            uniquenessRatio=5,
+            speckleWindowSize=0,
+            speckleRange=0,
+            preFilterCap=4,
             mode=cv.STEREO_SGBM_MODE_SGBM_3WAY
         )
 
@@ -235,6 +235,3 @@ leftMap1, leftMap2, rightMap1, rightMap2= rectification(CM1, distC1, CM2, distC2
 rectified_img_left, rectified_img_right = remaping(leftMap1, leftMap2, rightMap1, rightMap2, img_left, img_right)
 
 disparityMap(rectified_img_left, rectified_img_right)
-
-
-
